@@ -10,12 +10,13 @@ const generateRSAKeypair = require('keypair');
 const JWTool = require('fxa-jwtool');
 const ScopeSet = require('fxa-shared').oauth.scopes;
 
-const auth = require('../lib/auth');
+const auth = require('../lib/auth_client_management');
 const config = require('../lib/config');
 const db = require('../lib/db');
 const encrypt = require('../lib/encrypt');
 const P = require('../lib/promise');
-const Server = require('./lib/server');
+const testServer = require('./lib/server');
+const Server = testServer.wrappedServer;
 const unique = require('../lib/unique');
 const util = require('../lib/util');
 
@@ -2195,14 +2196,48 @@ describe('/v1', function() {
     });
 
     describe('client management api', function() {
-      it('should not be available on main server', function(){
+      it('can be disabled', () => {
+        const CustomServer = testServer.customServer({
+          clientManagementEnabled: false
+        });
+
         return P.all([
-          Server.api.get('/clients'),
-          Server.api.post('/client'),
-          Server.api.post('/client/' + clientId),
-          Server.api.delete('/client/' + clientId)
-        ]).map(function(res) {
+          CustomServer.api.get('/clients'),
+          CustomServer.api.post('/client'),
+          CustomServer.api.post('/client/' + clientId),
+          CustomServer.api.delete('/client/' + clientId)
+        ]).map((res) => {
           assert.equal(res.statusCode, 404);
+          assertSecurityHeaders(res);
+        });
+      });
+
+      it('can be enabled', () => {
+        const CustomServer = testServer.customServer({
+          clientManagementEnabled: true
+        });
+
+        return P.all([
+          CustomServer.api.get('/clients'),
+          CustomServer.api.post('/client'),
+          CustomServer.api.post('/client/' + clientId),
+          CustomServer.api.delete('/client/' + clientId)
+        ]).map((res) => {
+          assert.equal(res.statusCode, 401);
+          assertSecurityHeaders(res);
+        });
+      });
+
+      it('is enabled by default in tests', () => {
+        const CustomServer = testServer.customServer();
+
+        return P.all([
+          CustomServer.api.get('/clients'),
+          CustomServer.api.post('/client'),
+          CustomServer.api.post('/client/' + clientId),
+          CustomServer.api.delete('/client/' + clientId)
+        ]).map((res) => {
+          assert.equal(res.statusCode, 401);
           assertSecurityHeaders(res);
         });
       });
@@ -2210,7 +2245,7 @@ describe('/v1', function() {
       describe('GET /client/:id', function() {
         describe('response', function() {
           it('should support the client id path', function() {
-            return Server.internal.api.get('/client/' + clientId)
+            return Server.api.get('/client/' + clientId)
               .then(function(res) {
                 assert.equal(res.statusCode, 200);
                 assertSecurityHeaders(res);
@@ -2225,7 +2260,7 @@ describe('/v1', function() {
 
       describe('GET /clients', function() {
         it('should require authorization', function() {
-          return Server.internal.api.get({
+          return Server.api.get({
             url: '/clients'
           }).then(function(res) {
             assert.equal(res.statusCode, 401);
@@ -2234,7 +2269,7 @@ describe('/v1', function() {
         });
 
         it('should check whether the user is allowed', function() {
-          return Server.internal.api.get({
+          return Server.api.get({
             url: '/clients',
             headers: {
               authorization: 'Bearer ' + badTok
@@ -2249,7 +2284,7 @@ describe('/v1', function() {
           // this developer has no clients associated, it returns 0
           // value is the same as the API endpoint and a DB call
 
-          return Server.internal.api.get({
+          return Server.api.get({
             url: '/clients',
             headers: {
               authorization: 'Bearer ' + tok
@@ -2280,7 +2315,7 @@ describe('/v1', function() {
               var devId = developer.developerId;
               return db.registerClientDeveloper(devId, clientId);
             }).then(function () {
-              return Server.internal.api.get({
+              return Server.api.get({
                 url: '/clients',
                 headers: {
                   authorization: 'Bearer ' + tok
@@ -2299,7 +2334,7 @@ describe('/v1', function() {
 
       describe('POST', function() {
         before(function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/developer/activate',
             headers: {
               authorization: 'Bearer ' + tok
@@ -2309,7 +2344,7 @@ describe('/v1', function() {
         });
 
         it('should register a client', function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client',
             headers: {
               authorization: 'Bearer ' + tok,
@@ -2340,7 +2375,7 @@ describe('/v1', function() {
         });
 
         it('should require authorization', function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client',
             payload: {
               name: 'dont matter'
@@ -2352,7 +2387,7 @@ describe('/v1', function() {
         });
 
         it('should check the whether the user is allowed', function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client',
             headers: {
               authorization: 'Bearer ' + badTok
@@ -2364,7 +2399,7 @@ describe('/v1', function() {
         });
 
         it('should default optional fields to sensible values', function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client',
             headers: {
               authorization: 'Bearer ' + tok,
@@ -2420,7 +2455,7 @@ describe('/v1', function() {
               return db.getDeveloper(vemail);
             }).then(function (developer) {
             }).then(function () {
-              return Server.internal.api.post({
+              return Server.api.post({
                 url: '/client/' + id.toString('hex'),
                 headers: {
                   authorization: 'Bearer ' + tok,
@@ -2467,7 +2502,7 @@ describe('/v1', function() {
                 id.toString('hex')
               );
             }).then(function () {
-              return Server.internal.api.post({
+              return Server.api.post({
                 url: '/client/' + id.toString('hex'),
                 headers: {
                   authorization: 'Bearer ' + tok,
@@ -2492,7 +2527,7 @@ describe('/v1', function() {
         });
 
         it('should forbid unknown properties', function () {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client/' + id.toString('hex'),
             headers: {
               authorization: 'Bearer ' + tok
@@ -2507,7 +2542,7 @@ describe('/v1', function() {
         });
 
         it('should require authorization', function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client/' + id.toString('hex'),
             payload: {
               name: 'dont matter'
@@ -2519,7 +2554,7 @@ describe('/v1', function() {
         });
 
         it('should check the whether the user is allowed', function() {
-          return Server.internal.api.post({
+          return Server.api.post({
             url: '/client/' + id.toString('hex'),
             headers: {
               authorization: 'Bearer ' + badTok
@@ -2564,7 +2599,7 @@ describe('/v1', function() {
                 id.toString('hex')
               );
             }).then(function () {
-              return Server.internal.api.delete({
+              return Server.api.delete({
                 url: '/client/' + id.toString('hex'),
                 headers: {
                   authorization: 'Bearer ' + tok,
@@ -2604,7 +2639,7 @@ describe('/v1', function() {
               return db.getDeveloper(vemail);
             }).then(function (developer) {
             }).then(function () {
-              return Server.internal.api.delete({
+              return Server.api.delete({
                 url: '/client/' + id.toString('hex'),
                 headers: {
                   authorization: 'Bearer ' + tok,
@@ -2622,7 +2657,7 @@ describe('/v1', function() {
         it('should require authorization', function() {
           var id = unique.id();
 
-          return Server.internal.api.delete({
+          return Server.api.delete({
             url: '/client/' + id.toString('hex'),
             payload: {
               name: 'dont matter'
@@ -2636,7 +2671,7 @@ describe('/v1', function() {
         it('should check the whether the user is allowed', function() {
           var id = unique.id();
 
-          return Server.internal.api.delete({
+          return Server.api.delete({
             url: '/client/' + id.toString('hex'),
             headers: {
               authorization: 'Bearer ' + badTok
@@ -2803,7 +2838,7 @@ describe('/v1', function() {
           }).then(function(developer) {
             assert.equal(developer, null);
 
-            return Server.internal.api.post({
+            return Server.api.post({
               url: '/developer/activate',
               headers: {
                 authorization: 'Bearer ' + tok
@@ -2827,7 +2862,7 @@ describe('/v1', function() {
 
     describe('GET /developer', function() {
       it('should not exist', function() {
-        return Server.internal.api.get('/developer')
+        return Server.api.get('/developer')
           .then(function(res) {
             assert.equal(res.statusCode, 404);
             assertSecurityHeaders(res);
