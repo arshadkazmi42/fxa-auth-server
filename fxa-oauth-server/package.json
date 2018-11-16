@@ -34,6 +34,7 @@
     "hapi": "17.6.0",
     "hapi-hpkp": "2.0.0",
     "joi": "14.0.0",
+    "jsonwebtoken": "8.4.0",
     "keypair": "1.0.1",
     "mozlog": "2.2.0",
     "mysql": "2.15.0",

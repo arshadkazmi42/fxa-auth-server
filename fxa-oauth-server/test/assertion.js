@@ -9,7 +9,7 @@ const nock = require('nock');
 const config = require('../lib/config');
 const unique = require('../lib/unique');
 
-const verifyAssertion = require('../lib/browserid');
+const verifyAssertion = require('../lib/assertion');
 
 const ISSUER = config.get('browserid.issuer');
 const AUDIENCE = config.get('publicUrl');
@@ -39,7 +39,7 @@ const GOOD_RESPONSE = {
   }
 };
 
-const MOCK_ASSERTION = 'mock-assertion';
+const MOCK_ASSERTION = 'mock~assertion';
 
 const VERIFIER_URL = url.parse(config.get('browserid.verificationUrl'));
 

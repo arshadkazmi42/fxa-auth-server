@@ -29,6 +29,12 @@ const conf = convict({
     format: Boolean,
     default: false
   },
+  authServerSecrets: {
+    doc: 'Comma-separated list of secrets keys for verifying server-to-server JWTs',
+    env: 'AUTH_SERVER_SECRETS',
+    format: Array,
+    default: []
+  },
   browserid: {
     issuer: {
       doc: 'We only accept assertions from this issuer',

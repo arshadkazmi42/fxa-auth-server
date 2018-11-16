@@ -619,6 +619,26 @@ var conf = convict({
       format: 'duration',
       default: '3 days',
       env: 'OAUTH_CLIENT_INFO_CACHE_TTL'
+    },
+    secretKey: {
+      doc: 'Shared secret for signing server-to-server JWT assertions',
+      env: 'OAUTH_SERVER_SECRET_KEY',
+      format: String,
+      default: 'megaz0rd', // XXX TODO: check that we don't use this value in production
+    },
+    poolee: {
+      timeout: {
+        default: '30 seconds',
+        format: 'duration',
+        env: 'OAUTH_POOLEE_TIMEOUT',
+        doc: 'Time in milliseconds to wait for oauth query completion'
+      },
+      maxPending: {
+        default: 1000,
+        format: 'int',
+        env: 'OAUTH_POOLEE_MAX_PENDING',
+        doc: 'Number of pending requests to fxa-oauth-server to allow'
+      }
     }
   },
   metrics: {

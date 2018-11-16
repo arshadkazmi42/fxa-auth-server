@@ -9,7 +9,7 @@ const db = require('../db');
 const logger = require('../logging')('routes.key_data');
 const P = require('../promise');
 const validators = require('../validators');
-const verify = require('../browserid');
+const verifyAssertion = require('../assertion');
 const ScopeSet = require('fxa-shared').oauth.scopes;
 const config = require('../config');
 
@@ -48,7 +48,7 @@ module.exports = {
     const requestedClientId = req.payload.client_id;
 
     return P.all([
-      verify(req.payload.assertion),
+      verifyAssertion(req.payload.assertion),
       db.getClient(Buffer.from(requestedClientId, 'hex')).then((client) => {
         if (client) {
           // find all requested scopes that are allowed for this client.

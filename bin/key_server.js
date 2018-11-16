@@ -67,6 +67,7 @@ function run(config) {
   var statsInterval = null
   var database = null
   var customs = null
+  var oauthdb = null
 
   function logStatInfo() {
     log.stat(server.stat())
@@ -88,8 +89,9 @@ function run(config) {
       (db, translator) => {
         database = db
         const bounces = require('../lib/bounces')(config, db)
+        oauthdb = require('../lib/oauthdb')(log, config)
 
-        return require('../lib/senders')(log, config, error, bounces, translator)
+        return require('../lib/senders')(log, config, error, bounces, translator, oauthdb)
           .then(result => {
             senders = result
             customs = new Customs(config.customsUrl)
@@ -98,6 +100,7 @@ function run(config) {
               serverPublicKeys,
               signer,
               db,
+              oauthdb,
               senders.email,
               senders.sms,
               Password,
@@ -108,7 +111,7 @@ function run(config) {
             statsInterval = setInterval(logStatInfo, 15000)
 
             async function init() {
-              server = await Server.create(log, error, config, routes, db, translator)
+              server = await Server.create(log, error, config, routes, db, oauthdb, translator)
               try {
                 await server.start()
                 log.info({op: 'server.start.1', msg: 'running on ' + server.info.uri})
@@ -140,6 +143,7 @@ function run(config) {
             clearInterval(statsInterval)
             server.stop().then(() => {
               customs.close()
+              oauthdb.close()
               try {
                 senders.email.stop()
               } catch (e) {
